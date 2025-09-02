@@ -8,12 +8,155 @@ This document contains my solutions to the Port Support Engineer assignment exer
 
 ## Exercise 1: JQ Patterns
 
-### Sample Data Used
+### Sample Data
 
 **K8s Deployment Object:**
 [K8s](https://gist.github.com/MPTG94/8fc7f5d19d42cdb4e2a111fa65a91254)
 **Jira API Issue Response:**
 [Issue](https://gist.github.com/MPTG94/c33e47ff18cbe987c7b1c64e202ce6e1)
+
+#### Sample Data (NOTE: Data is truncated for compactness)
+
+**K8s Deployment Object:**
+
+```json
+{
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+        "annotations": {
+            "deployment.kubernetes.io/revision": "1",
+            "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"commitHash\":\"b2633eae0655322b22f1637eb309ba4052ceeb74\",\"environment\":\"production-gcp-1\",\"service\":\"authorization\"},\"name\":\"authorization-service-production-gcp-1\",\"namespace\":\"port-sales-demo\"},\"spec\":{\"replicas\":1,\"revisionHistoryLimit\":3,\"selector\":{\"matchLabels\":{\"app\":\"authorization-service-production-gcp-1\"}},\"template\":{\"metadata\":{\"labels\":{\"app\":\"authorization-service-production-gcp-1\"}},\"spec\":{\"containers\":[{\"image\":\"public.ecr.aws/y8q1v8m0/fastapi-sample:latest\",\"imagePullPolicy\":\"Always\",\"name\":\"authorization-service\",\"ports\":[{\"containerPort\":80}]}]}}}}\n"
+        },
+        "creationTimestamp": "2023-07-27T14:41:15Z",
+        "generation": 2,
+        "labels": {
+            "commitHash": "b2633eae0655322b22f1637eb309ba4052ceeb74",
+            "environment": "production-gcp-1",
+            "service": "authorization"
+        },
+        "name": "authorization-service-production-gcp-1",
+        "namespace": "port-sales-demo",
+        "resourceVersion": "3834920",
+        "uid": "bba9bc85-62fe-4eb3-b804-37e2e8d5d48c"
+    },
+    "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 3,
+        "selector": {
+            "matchLabels": {
+                "app": "authorization-service-production-gcp-1"
+            }
+        },
+        "strategy": {
+            "rollingUpdate": {
+                "maxSurge": "25%",
+                "maxUnavailable": "25%"
+            },
+            "type": "RollingUpdate"
+        },
+        "template": {
+            "metadata": {
+                "creationTimestamp": null,
+                "labels": {
+                    "app": "authorization-service-production-gcp-1"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "image": "public.ecr.aws/y8q1v8m0/fastapi-sample:latest",
+                        "imagePullPolicy": "Always",
+                        "name": "authorization-service",
+                        "ports": [
+                            {
+                                "containerPort": 80,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "terminationGracePeriodSeconds": 30
+            }
+        }
+    },
+    "status": {
+        "availableReplicas": 1,
+        "conditions": [
+            {
+                "lastTransitionTime": "2023-07-27T14:41:16Z",
+                "lastUpdateTime": "2023-07-27T14:41:16Z",
+                "message": "Deployment has minimum availability.",
+                "reason": "MinimumReplicasAvailable",
+                "status": "True",
+                "type": "Available"
+            },
+            {
+                "lastTransitionTime": "2023-07-27T14:41:15Z",
+                "lastUpdateTime": "2023-07-27T14:41:16Z",
+                "message": "ReplicaSet \"authorization-service-production-gcp-1-659fc44545\" has successfully progressed.",
+                "reason": "NewReplicaSetAvailable",
+                "status": "True",
+                "type": "Progressing"
+            }
+        ],
+        "observedGeneration": 2,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "updatedReplicas": 1
+    }
+}
+```
+
+**Jira API Issue Response:**
+
+```json
+{
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations,customfield_10010.requestTypePractice",
+    "id": "13497",
+    "self": "https://sample.atlassian.net/rest/api/3/issue/13497",
+    "key": "SAMPLE-3490",
+    "fields": {
+        "statuscategorychangedate": "2023-07-19T11:15:09.444+0300",
+        "issuetype": {
+            "self": "https://sample.atlassian.net/rest/api/3/issuetype/10001",
+            "id": "10001",
+            "description": "Functionality or a feature expressed as a user goal.",
+            "iconUrl": "https://sample.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
+            "name": "Story",
+            "subtask": false,
+            "avatarId": 10315,
+            "hierarchyLevel": 0
+        },
+        "timespent": null,
+        "customfield_10030": null,
+        "project": {
+            "self": "https://sample.atlassian.net/rest/api/3/project/10000",
+            "id": "10000",
+            "key": "SAMPLE",
+            "name": "Sample",
+            "projectTypeKey": "software",
+            "simplified": false,
+            "avatarUrls": {
+                "48x48": "https://sample.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10551",
+                "24x24": "https://sample.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10551?size=small",
+                "16x16": "https://sample.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10551?size=xsmall",
+                "32x32": "https://sample.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10551?size=medium"
+            }
+        },
+    }
+}
+...
+```
+
 ### Solutions
 
 #### 1a. Extract Current Replica Count
@@ -26,7 +169,13 @@ This document contains my solutions to the Port Support Engineer assignment exer
 
 **Explanation:** This pattern navigates to the `spec` object and extracts the `replicas` field, which contains the desired number of pod replicas for the deployment.
 
+The `dot (.)` operator gets the current input data, `spec `fetches the spec dictionary, next `.`get's that data as the current input and `replicas `returns the data available in the `replica` attribute
+
 **Output:** `1`
+
+#### ScreenShot
+
+![1756800343117](image/README/1756800343117.png)
 
 **Tested in jqplay.org:** ✅ Verified
 
@@ -42,6 +191,10 @@ This document contains my solutions to the Port Support Engineer assignment exer
 
 **Output:** `"RollingUpdate"`
 
+#### ScreenShot
+
+![1756800426783](image/README/1756800426783.png)
+
 **Tested in jqplay.org:** ✅ Verified
 
 #### 1c. Concatenate Service and Environment Labels
@@ -54,7 +207,13 @@ This document contains my solutions to the Port Support Engineer assignment exer
 
 **Explanation:** This pattern accesses the metadata labels, extracts both the "service" and "environment" label values, and concatenates them with a hyphen separator.
 
+The `+` operator is used to concatenate different parts of the response.
+
 **Output:** `"authorization-production-gcp-1"`
+
+#### ScreenShot
+
+![1756800581428](image/README/1756800581428.png)
 
 **Tested in jqplay.org:** ✅ Verified
 
@@ -66,19 +225,19 @@ This document contains my solutions to the Port Support Engineer assignment exer
 .fields.subtasks | map(.key)
 ```
 
-**Explanation:** This pattern navigates to the subtasks array within the fields object, then uses the `map()` function to extract the `key` field (which contains the issue ID like "SAMPLE-123") from each subtask object, returning an array of all subtask IDs.
+**Explanation:** This pattern navigates to the subtasks array within the fields object, then uses the `map()` function to extract the `key` field (which contains the issue ID like "SAMPLE-123") from each subtask object, returning an array of all subtask IDs. The `|` is used to pass the data from one end to another.
 
-**Output:** `[
-  "SAMPLE-3894", "SAMPLE-3895", "SAMPLE-3896",  "SAMPLE-3897",  "SAMPLE-3898",  "SAMPLE-3899", 
-  "SAMPLE-3900",  "SAMPLE-3902", "SAMPLE-3904",  "SAMPLE-3901", "SAMPLE-3905", "SAMPLE-3906", "SAMPLE-3907"
-  ]`
+**Output:** `["SAMPLE-3894", "SAMPLE-3895", "SAMPLE-3896", "SAMPLE-3897", "SAMPLE-3898", "SAMPLE-3899", "SAMPLE-3900", "SAMPLE-3902", "SAMPLE-3904", "SAMPLE-3901", "SAMPLE-3905", "SAMPLE-3906", "SAMPLE-3907"]`
+
+#### ScreenShot
+
+![1756801445978](image/README/1756801445978.png)
 
 **Tested in jqplay.org:** ✅ Verified
 
 ### Testing Evidence
 
 All JQ patterns were tested and verified using [jqplay.org](https://jqplay.org) with the sample data provided above. Each pattern produces the expected output format and handles the data structure correctly.
-
 
 ---
 
@@ -97,12 +256,30 @@ Successfully configured Port with GitHub and Jira integrations using real data, 
 - ✅ Repository blueprint automatically created during onboarding
 - ✅ Real repository data ingested from GitHub account
 
+#### ScreenShot
+
+![1756827372102](image/README/1756827372102.png)
+
+![1756827384585](image/README/1756827384585.png)![1756827418848](image/README/1756827418848.png)
+
+![1756827428656](image/README/1756827428656.png)
+
+![1756827447640](image/README/1756827447640.png)
+
 #### 2. Jira Account Setup
 
 - ✅ Created free Jira account
 - ✅ Created new project using "Software Development" → "Scrum" → "Company-managed project"
 - ✅ Verified access to Components feature in project sidebar
 - ✅ Project configured with proper permissions and settings
+
+#### ScreenShot
+
+![1756827538494](image/README/1756827538494.png)![1756827546131](image/README/1756827546131.png)
+
+![1756827557183](image/README/1756827557183.png)
+
+![1756827574189](image/README/1756827574189.png)
 
 #### 3. Jira Integration Deployment
 
@@ -112,6 +289,12 @@ Successfully configured Port with GitHub and Jira integrations using real data, 
 - ✅ Deployed using GitHub Actions workflow
 - ✅ Configured with proper Jira API credentials
 - ✅ Set up scheduled sync every 30 minutes
+
+#### ScreenShot
+
+![1756827633358](image/README/1756827633358.png)
+
+![1756827640435](image/README/1756827640435.png)![1756827649726](image/README/1756827649726.png)
 
 **Integration Configuration:**
 
@@ -148,13 +331,27 @@ jobs:
 - ✅ Configured many-to-many relationship (issue can relate to multiple repositories)
 - ✅ Updated blueprint schema to support component mapping
 
+#### ScreenShot
+
+![1756827708995](image/README/1756827708995.png)
+
 #### 5. Jira Components Creation
 
 Created components matching GitHub repositories:
 
 - ✅ `port-task` component → matches `port-task` repository
-- ✅ `demo-app` component → matches `demo-app` repository
+- ✅ `ilearnova-be` component → matches `ilearnova-be` repository
 - ✅ Components created in Jira project settings (not Atlassian Compass)
+
+#### ScreenShot
+
+![1756827884259](image/README/1756827884259.png)
+
+![1756827892058](image/README/1756827892058.png)
+
+![1756828076696](image/README/1756828076696.png)
+
+![1756828091354](image/README/1756828091354.png)
 
 #### 6. Integration Mapping Configuration
 
@@ -168,15 +365,15 @@ else
 end
 ```
 
+#### ScreenShot
+
+![1756827751265](image/README/1756827751265.png)
+
+![1756827956821](image/README/1756827956821.png)
+
+![1756827966653](image/README/1756827966653.png)
+
 **Explanation:** This mapping extracts component names from Jira issues and creates relations to repositories with matching names. The conditional handles issues without components gracefully.
-
-### Evidence Screenshots
-
-![Port GitHub Integration](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdiJQhAzF0yVmt36OMjIEZsbVRZy9Ym8yN8JdQpeFp90AJV-IrjjDuLrG92lIX4OD23484vYcvnLTc4-72CBonQOJojnmcXQXbjH3wrrwnD5fo2hT6mhdBxtZPkCbtOdZJgG9WQLA?key=KiLXQHrkgBd-SxCs2HeFfw)
-
-![Data Model Relation](https://lh7-rt.googleusercontent.com/docsz/AD_4nXfpujcZ3uox5w4k00bqdTEsOauEPi9NcUQcMWLNP3bElh_K9Xq9qp06pxzzroubRssekQOTyUy-s7OKyMtqcHctBsgeej-_f-GVM_l1eqQVUlKFyGWCCSBE3_4xPMGk3yK2y9X7cg?key=KiLXQHrkgBd-SxCs2HeFfw)
-
-![Jira Components](https://lh7-rt.googleusercontent.com/docsz/AD_4nXf63sfVYRgJAKL8wYByTSR0au2r9QIZbyd6YH7JrpmWpi1W2W3ZqjL87jyOH2TiUgvp7TZHAWtRMIKEtCZ4_swXO3bIHN4QSS6gcIGo68bWPohlFSuVTEpaImk84fvLDR49kgQSKQ?key=KiLXQHrkgBd-SxCs2HeFfw)
 
 ### Verification
 
@@ -215,6 +412,12 @@ Create a scorecard for repositories that tracks open pull requests with the foll
   "description": "counts the number of open PRs in the repository"
 }
 ```
+
+#### ScreenShot
+
+![1756831559498](image/README/1756831559498.png)
+
+![1756831777078](image/README/1756831777078.png)
 
 **Calculation Method:**
 The property uses Port's built-in GitHub integration to count open pull requests. The integration automatically queries the GitHub API and calculates the count using the following logic:
@@ -310,13 +513,18 @@ The property uses Port's built-in GitHub integration to count open pull requests
    - Open PRs: 5
    - Scorecard Result: **Silver** ✅
 
-#### Screenshots
-
-![Property Configuration](https://lh7-rt.googleusercontent.com/docsz/AD_4nXeiO4hi6ajD3y-E0UYk1kWlhjKq0vcpDHr6X0A1s0r28cu3sb69v4UC72vPynefW4wZkCRfvqre8NdZHW9UAaB4RjC2dxODJGFOKpMIjC3VdWqvL-HTJQArBpX_cu3aCHcJG8IVew?key=KiLXQHrkgBd-SxCs2HeFfw)
+#### ScreenShot
 
 ![Scorecard Rules](https://lh7-rt.googleusercontent.com/docsz/AD_4nXc1s_M7vxVajtkrmDiGDPXZcDpUkZsuDIQJbwhNjeewFaLQWKJT_jYdIW7dxQQXHI5XdO2RaShzVpBipVI1-NAPKkaORKfwE1velwBpGW88g3uvWeomFlftX7F4yRg8_ldu6N0b7A?key=KiLXQHrkgBd-SxCs2HeFfw)
 
 ![Scorecard Results](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdCuQIzbVttZI6tN05y-RO0gm31p7MiwmUDQggT94sDfCYCcb1LnSaOm_-l136AjxiWv9KULIdhoeboTpKPTV9IsjAdgJb5-GnDacmavfXp8DfnlXRhzet_Dz_BzWcKKDBgmTYEjw?key=KiLXQHrkgBd-SxCs2HeFfw)
+
+![1756833250410](image/README/1756833250410.png)
+
+![1756833554565](image/README/1756833554565.png)
+
+
+![1756832788933](image/README/1756832788933.png)
 
 ### Verification
 
