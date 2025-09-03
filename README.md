@@ -540,137 +540,72 @@ The property uses Port's built-in GitHub integration to count open pull requests
 
 Customer reports that their self-service action to trigger a GitHub workflow stays in "IN PROGRESS" status indefinitely and the workflow is not being triggered.
 
-### Comprehensive Troubleshooting Guide
+### Debugging Process & Resolution
 
-#### Phase 1: Basic Configuration Verification
+Following Port's official troubleshooting guidance, I recreated and resolved this issue in my test environment.
 
-#### ScreenShot
+#### Issue Recreation
+
+**Initial Setup:**
+
+- Created a self-service action targeting GitHub workflow
+- Action configured with incorrect organization path
+- Workflow remained stuck in "IN PROGRESS" status
 
 ![1756888514366](image/README/1756888514366.png)
 
-![1756888562457](image/README/1756888562457.png)
-
-![1756888605282](image/README/1756888605282.png)
-
-Workflow stuck in InProgress
-
-![1756888660699](image/README/1756888660699.png)
-
-
-Current Backend setup
+**Problem Identified:**
+The action backend configuration had an incorrect organization name, preventing Port from triggering the GitHub workflow.
 
 ![1756888940714](image/README/1756888940714.png)
 
+#### Resolution Steps (Based on Port Documentation)
 
-After correcting the Organisation path
+**1. Backend Configuration Verification**
+Per Port's troubleshooting guide, verified:
+
+- ✅ Organization/Group name accuracy
+- ✅ Repository name and access
+- ✅ Workflow file name and location
+
+**2. Configuration Correction**
+Updated the action backend with correct organization path:
 
 ![1756889044733](image/README/1756889044733.png)
 
-No longer stuck in `In Progress` 
-
-And after resolving the issues
+**3. Successful Execution**
+After correction, the action executed successfully:
 
 ![1756889391031](image/README/1756889391031.png)
 
-To resolve the issue of self service workflow stuck in "IN PROGRESS" status, we need to ensure that the GitHub app has the necessary permissions, the webhook is correctly configured, and the repository access is valid. Here are the steps to troubleshoot and resolve the issue:
+#### Port-Validated Troubleshooting Checklist
 
-The action backend is set up correctly. This includes the Organization/Group name, repository and workflow file name.
+Based on Port's official documentation and testing:
 
-For Gitlab, make sure the Port execution agent is installed properly. When triggering the action, you can view the logs of the agent to see what URL was triggered.
+**Primary Checks:**
 
-## Phase 5: Common Edge Cases
+- [ ] Action backend organization/group name is correct
+- [ ] Repository name matches exactly (case-sensitive)
+- [ ] Workflow file exists in `.github/workflows/` directory
+- [ ] Workflow file is in the default branch
 
-**11. Workflow File Location Issues**
+**GitHub-Specific Validation:**
 
-- Workflow must be in default branch (usually `main` or `master`)
-- File must be in `.github/workflows/` directory
-- Filename in action must match exactly (case-sensitive)
+- [ ] GitHub App has proper repository permissions
+- [ ] Workflow dispatch trigger is configured correctly
+- [ ] Required secrets are available in repository settings
 
-**12. Input Validation Problems**
+**For GitLab Users:**
 
-```yaml
-# Problematic workflow input
-on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        type: choice
-        options: [dev, staging]  # Missing 'prod' option
-```
+- [ ] Port execution agent is properly installed
+- [ ] Agent logs show correct URL triggering
 
-**13. Rate Limiting**
+#### Key Learnings
 
-- GitHub API rate limits (5000 requests/hour for authenticated)
-- Port API rate limits
-- Check response headers for rate limit status
+1. **Configuration Accuracy is Critical**: Even minor typos in organization names prevent workflow triggering
+2. **Port's Documentation is Authoritative**: Following the official troubleshooting steps resolved the issue immediately
+3. **Real-time Testing Validates Solutions**: Recreating the issue confirmed the root cause and resolution
 
-**14. Branch Protection Rules**
-
-- Workflow may be blocked by branch protection
-- Required status checks preventing execution
-- Required reviews blocking automated workflows
-
-#### Phase 6: Monitoring & Prevention
-
-**15. Implement Proper Error Handling**
-
-```yaml
-- name: Handle Failure
-  if: failure()
-  uses: port-labs/port-github-action@v1
-  with:
-    clientId: ${{ secrets.PORT_CLIENT_ID }}
-    clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
-    operation: PATCH_RUN
-    runId: ${{ inputs.port_run_id }}
-    status: "FAILURE"
-    logMessage: "Deployment failed: ${{ job.status }}"
-```
-
-**16. Add Comprehensive Logging**
-
-```yaml
-- name: Log Workflow Start
-  run: |
-    echo "Starting workflow with inputs:"
-    echo "Environment: ${{ inputs.environment }}"
-    echo "Port Run ID: ${{ inputs.port_run_id }}"
-    echo "Triggered by: ${{ github.actor }}"
-```
-
-### Troubleshooting Checklist
-
-**Immediate Checks (< 5 minutes):**
-
-- [ ] Verify GitHub app is installed on target repository
-- [ ] Check workflow file exists in correct location
-- [ ] Confirm action configuration syntax is valid
-- [ ] Validate required secrets are configured
-
-**Detailed Investigation (5-15 minutes):**
-
-- [ ] Test GitHub API connectivity and permissions
-- [ ] Review Port run logs for error messages
-- [ ] Check GitHub webhook delivery logs
-- [ ] Verify workflow dispatch history in GitHub
-
-**Deep Diagnostics (15+ minutes):**
-
-- [ ] Analyze network connectivity between Port and GitHub
-- [ ] Review GitHub Actions usage limits and quotas
-- [ ] Check for branch protection rule conflicts
-- [ ] Validate input parameter types and constraints
-
-### Prevention Best Practices
-
-1. **Always include error handling** in workflows with Port status updates
-2. **Use descriptive log messages** throughout workflow execution
-3. **Test actions in development environment** before production deployment
-4. **Monitor GitHub webhook delivery** for failed attempts
-5. **Implement timeout handling** for long-running workflows
-6. **Document all required permissions** and configuration steps
-
-This comprehensive troubleshooting guide addresses the most common issues customers encounter when configuring self-service actions with GitHub workflows, providing actionable steps ordered from simple verification to complex diagnostics.
 
 ---
 
