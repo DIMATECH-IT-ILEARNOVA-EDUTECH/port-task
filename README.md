@@ -523,7 +523,6 @@ The property uses Port's built-in GitHub integration to count open pull requests
 
 ![1756833554565](image/README/1756833554565.png)
 
-
 ![1756832788933](image/README/1756832788933.png)
 
 ### Verification
@@ -545,159 +544,41 @@ Customer reports that their self-service action to trigger a GitHub workflow sta
 
 #### Phase 1: Basic Configuration Verification
 
-**1. GitHub App Permissions**
+#### ScreenShot
 
-```bash
-# Check if GitHub app has required permissions
-curl -H "Authorization: token $GITHUB_TOKEN" \
-     -H "Accept: application/vnd.github.v3+json" \
-     https://api.github.com/repos/OWNER/REPO/installation
-```
+![1756888514366](image/README/1756888514366.png)
 
-**Common Issues:**
+![1756888562457](image/README/1756888562457.png)
 
-- Missing "Actions" write permission
-- Missing "Contents" read permission
-- Missing "Metadata" read permission
-- App not installed on target repository
+![1756888605282](image/README/1756888605282.png)
 
-**2. Webhook Configuration**
+Workflow stuck in InProgress
 
-- Verify webhook URL points to Port: `https://ingest.port.io/github`
-- Check webhook secret matches Port configuration
-- Ensure webhook is active and has "Workflow runs" event enabled
+![1756888660699](image/README/1756888660699.png)
 
-**3. Repository Access**
 
-```bash
-# Verify repository exists and is accessible
-curl -H "Authorization: token $GITHUB_TOKEN" \
-     https://api.github.com/repos/OWNER/REPO
-```
+Current Backend setup
 
-#### Phase 2: Self-Service Action Configuration
+![1756888940714](image/README/1756888940714.png)
 
-**4. Action Definition Validation**
 
-```json
-{
-  "identifier": "deploy_service",
-  "title": "Deploy Service",
-  "trigger": {
-    "type": "self-service",
-    "operation": "CREATE",
-    "userInputs": {
-      "properties": {
-        "environment": {
-          "type": "string",
-          "enum": ["dev", "staging", "prod"]
-        }
-      }
-    }
-  },
-  "invocationMethod": {
-    "type": "GITHUB",
-    "org": "your-org",
-    "repo": "your-repo",
-    "workflow": "deploy.yml",
-    "workflowInputs": {
-      "environment": "{{ .inputs.environment }}",
-      "port_run_id": "{{ .run.id }}"
-    }
-  }
-}
-```
+After correcting the Organisation path
 
-**Common Configuration Errors:**
+![1756889044733](image/README/1756889044733.png)
 
-- Incorrect workflow file path (must include `.yml` or `.yaml`)
-- Missing required workflow inputs
-- Invalid Jinja2 templating syntax
-- Wrong organization or repository name
+No longer stuck in `In Progress` 
 
-**5. Workflow File Verification**
+And after resolving the issues
 
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy Service
-on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        required: true
-        type: choice
-        options: [dev, staging, prod]
-      port_run_id:
-        required: true
-        type: string
+![1756889391031](image/README/1756889391031.png)
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Update Port Run Status
-        uses: port-labs/port-github-action@v1
-        with:
-          clientId: ${{ secrets.PORT_CLIENT_ID }}
-          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
-          operation: PATCH_RUN
-          runId: ${{ inputs.port_run_id }}
-          logMessage: "Starting deployment to ${{ inputs.environment }}"
-```
+To resolve the issue of self service workflow stuck in "IN PROGRESS" status, we need to ensure that the GitHub app has the necessary permissions, the webhook is correctly configured, and the repository access is valid. Here are the steps to troubleshoot and resolve the issue:
 
-**Critical Requirements:**
+The action backend is set up correctly. This includes the Organization/Group name, repository and workflow file name.
 
-- Must use `workflow_dispatch` trigger
-- Must accept `port_run_id` as input
-- Should update Port run status during execution
+For Gitlab, make sure the Port execution agent is installed properly. When triggering the action, you can view the logs of the agent to see what URL was triggered.
 
-#### Phase 3: Authentication & Secrets
-
-**6. Port Credentials Verification**
-
-```bash
-# Test Port API access
-curl -X POST https://api.port.io/v1/auth/access_token \
-  -H "Content-Type: application/json" \
-  -d '{
-    "clientId": "YOUR_CLIENT_ID",
-    "clientSecret": "YOUR_CLIENT_SECRET"
-  }'
-```
-
-**7. GitHub Secrets Configuration**
-Required secrets in repository:
-
-- `PORT_CLIENT_ID`: Port application client ID
-- `PORT_CLIENT_SECRET`: Port application client secret
-- Any additional secrets needed by workflow
-
-#### Phase 4: Advanced Diagnostics
-
-**8. Port Run Logs Analysis**
-
-```bash
-# Get run details and logs
-curl -X GET "https://api.port.io/v1/actions/runs/$RUN_ID" \
-  -H "Authorization: Bearer $PORT_TOKEN"
-```
-
-**9. GitHub Workflow Dispatch Verification**
-
-```bash
-# Check if workflow was actually triggered
-curl -H "Authorization: token $GITHUB_TOKEN" \
-     -H "Accept: application/vnd.github.v3+json" \
-     https://api.github.com/repos/OWNER/REPO/actions/workflows/deploy.yml/runs
-```
-
-**10. Network Connectivity Testing**
-
-- Verify Port can reach GitHub API (check firewall rules)
-- Test webhook delivery from GitHub to Port
-- Validate DNS resolution for both services
-
-#### Phase 5: Common Edge Cases
+## Phase 5: Common Edge Cases
 
 **11. Workflow File Location Issues**
 
