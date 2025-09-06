@@ -15,148 +15,6 @@ This document contains my solutions to the Port Support Engineer assignment exer
 **Jira API Issue Response:**
 [Issue](https://gist.github.com/MPTG94/c33e47ff18cbe987c7b1c64e202ce6e1)
 
-#### Sample Data (NOTE: Data is truncated for compactness)
-
-**K8s Deployment Object:**
-
-```json
-{
-    "apiVersion": "apps/v1",
-    "kind": "Deployment",
-    "metadata": {
-        "annotations": {
-            "deployment.kubernetes.io/revision": "1",
-            "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"commitHash\":\"b2633eae0655322b22f1637eb309ba4052ceeb74\",\"environment\":\"production-gcp-1\",\"service\":\"authorization\"},\"name\":\"authorization-service-production-gcp-1\",\"namespace\":\"port-sales-demo\"},\"spec\":{\"replicas\":1,\"revisionHistoryLimit\":3,\"selector\":{\"matchLabels\":{\"app\":\"authorization-service-production-gcp-1\"}},\"template\":{\"metadata\":{\"labels\":{\"app\":\"authorization-service-production-gcp-1\"}},\"spec\":{\"containers\":[{\"image\":\"public.ecr.aws/y8q1v8m0/fastapi-sample:latest\",\"imagePullPolicy\":\"Always\",\"name\":\"authorization-service\",\"ports\":[{\"containerPort\":80}]}]}}}}\n"
-        },
-        "creationTimestamp": "2023-07-27T14:41:15Z",
-        "generation": 2,
-        "labels": {
-            "commitHash": "b2633eae0655322b22f1637eb309ba4052ceeb74",
-            "environment": "production-gcp-1",
-            "service": "authorization"
-        },
-        "name": "authorization-service-production-gcp-1",
-        "namespace": "port-sales-demo",
-        "resourceVersion": "3834920",
-        "uid": "bba9bc85-62fe-4eb3-b804-37e2e8d5d48c"
-    },
-    "spec": {
-        "progressDeadlineSeconds": 600,
-        "replicas": 1,
-        "revisionHistoryLimit": 3,
-        "selector": {
-            "matchLabels": {
-                "app": "authorization-service-production-gcp-1"
-            }
-        },
-        "strategy": {
-            "rollingUpdate": {
-                "maxSurge": "25%",
-                "maxUnavailable": "25%"
-            },
-            "type": "RollingUpdate"
-        },
-        "template": {
-            "metadata": {
-                "creationTimestamp": null,
-                "labels": {
-                    "app": "authorization-service-production-gcp-1"
-                }
-            },
-            "spec": {
-                "containers": [
-                    {
-                        "image": "public.ecr.aws/y8q1v8m0/fastapi-sample:latest",
-                        "imagePullPolicy": "Always",
-                        "name": "authorization-service",
-                        "ports": [
-                            {
-                                "containerPort": 80,
-                                "protocol": "TCP"
-                            }
-                        ],
-                        "resources": {},
-                        "terminationMessagePath": "/dev/termination-log",
-                        "terminationMessagePolicy": "File"
-                    }
-                ],
-                "dnsPolicy": "ClusterFirst",
-                "restartPolicy": "Always",
-                "schedulerName": "default-scheduler",
-                "securityContext": {},
-                "terminationGracePeriodSeconds": 30
-            }
-        }
-    },
-    "status": {
-        "availableReplicas": 1,
-        "conditions": [
-            {
-                "lastTransitionTime": "2023-07-27T14:41:16Z",
-                "lastUpdateTime": "2023-07-27T14:41:16Z",
-                "message": "Deployment has minimum availability.",
-                "reason": "MinimumReplicasAvailable",
-                "status": "True",
-                "type": "Available"
-            },
-            {
-                "lastTransitionTime": "2023-07-27T14:41:15Z",
-                "lastUpdateTime": "2023-07-27T14:41:16Z",
-                "message": "ReplicaSet \"authorization-service-production-gcp-1-659fc44545\" has successfully progressed.",
-                "reason": "NewReplicaSetAvailable",
-                "status": "True",
-                "type": "Progressing"
-            }
-        ],
-        "observedGeneration": 2,
-        "readyReplicas": 1,
-        "replicas": 1,
-        "updatedReplicas": 1
-    }
-}
-```
-
-**Jira API Issue Response:**
-
-```json
-{
-    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations,customfield_10010.requestTypePractice",
-    "id": "13497",
-    "self": "https://sample.atlassian.net/rest/api/3/issue/13497",
-    "key": "SAMPLE-3490",
-    "fields": {
-        "statuscategorychangedate": "2023-07-19T11:15:09.444+0300",
-        "issuetype": {
-            "self": "https://sample.atlassian.net/rest/api/3/issuetype/10001",
-            "id": "10001",
-            "description": "Functionality or a feature expressed as a user goal.",
-            "iconUrl": "https://sample.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
-            "name": "Story",
-            "subtask": false,
-            "avatarId": 10315,
-            "hierarchyLevel": 0
-        },
-        "timespent": null,
-        "customfield_10030": null,
-        "project": {
-            "self": "https://sample.atlassian.net/rest/api/3/project/10000",
-            "id": "10000",
-            "key": "SAMPLE",
-            "name": "Sample",
-            "projectTypeKey": "software",
-            "simplified": false,
-            "avatarUrls": {
-                "48x48": "https://sample.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10551",
-                "24x24": "https://sample.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10551?size=small",
-                "16x16": "https://sample.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10551?size=xsmall",
-                "32x32": "https://sample.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10551?size=medium"
-            }
-        },
-    }
-}
-...
-```
-
 ### Solutions
 
 #### 1a. Extract Current Replica Count
@@ -177,8 +35,6 @@ The `dot (.)` operator gets the current input data, `spec `fetches the spec dict
 
 ![1756800343117](image/README/1756800343117.png)
 
-**Tested in jqplay.org:** ✅ Verified
-
 #### 1b. Extract Deployment Strategy
 
 **JQ Pattern:**
@@ -194,8 +50,6 @@ The `dot (.)` operator gets the current input data, `spec `fetches the spec dict
 #### ScreenShot
 
 ![1756800426783](image/README/1756800426783.png)
-
-**Tested in jqplay.org:** ✅ Verified
 
 #### 1c. Concatenate Service and Environment Labels
 
@@ -215,8 +69,6 @@ The `+` operator is used to concatenate different parts of the response.
 
 ![1756800581428](image/README/1756800581428.png)
 
-**Tested in jqplay.org:** ✅ Verified
-
 #### 2. Extract All Subtask IDs
 
 **JQ Pattern:**
@@ -232,12 +84,6 @@ The `+` operator is used to concatenate different parts of the response.
 #### ScreenShot
 
 ![1756801445978](image/README/1756801445978.png)
-
-**Tested in jqplay.org:** ✅ Verified
-
-### Testing Evidence
-
-All JQ patterns were tested and verified using [jqplay.org](https://jqplay.org) with the sample data provided above. Each pattern produces the expected output format and handles the data structure correctly.
 
 ---
 
@@ -258,26 +104,37 @@ Successfully configured Port with GitHub and Jira integrations using real data, 
 
 #### ScreenShot
 
+* Empty Data source without any installed apps.
+
 ![1756827372102](image/README/1756827372102.png)
 
-![1756827384585](image/README/1756827384585.png)![1756827418848](image/README/1756827418848.png)
+* Selecting the github app to install
+
+![1756827384585](image/README/1756827384585.png)
+
+* Installing the GetPort app to the GitHub repo
+
+![1756827418848](image/README/1756827418848.png)
+
+* GetPort installed
 
 ![1756827428656](image/README/1756827428656.png)
+
+* Data source page showing an installed github port app
 
 ![1756827447640](image/README/1756827447640.png)
 
 #### 2. Jira Account Setup
 
-- ✅ Created free Jira account
-- ✅ Created new project using "Software Development" → "Scrum" → "Company-managed project"
-- ✅ Verified access to Components feature in project sidebar
-- ✅ Project configured with proper permissions and settings
+* ✅ Created new project using "Software Development" → "Scrum" → "Company-managed project"
 
-#### ScreenShot
+![1756827538494](image/README/1756827538494.png)
 
-![1756827538494](image/README/1756827538494.png)![1756827546131](image/README/1756827546131.png)
+![1756827546131](image/README/1756827546131.png)
 
 ![1756827557183](image/README/1756827557183.png)
+
+* ✅ Verified access to Components feature in project sidebar
 
 ![1756827574189](image/README/1756827574189.png)
 
@@ -285,18 +142,23 @@ Successfully configured Port with GitHub and Jira integrations using real data, 
 
 **Deployment Method:** Scheduled GitHub Workflow (NOT "Hosted by Port")
 
-- ✅ Used Port Ocean integration for Jira
-- ✅ Deployed using GitHub Actions workflow
-- ✅ Configured with proper Jira API credentials
-- ✅ Set up scheduled sync every 30 minutes
-
 #### ScreenShot
+
+* ✅ Used Port Ocean integration for Jira
 
 ![1756827633358](image/README/1756827633358.png)
 
-![1756827640435](image/README/1756827640435.png)![1756827649726](image/README/1756827649726.png)
+* ✅ Deployed using GitHub Actions workflow
+
+![1756827640435](image/README/1756827640435.png)
+
+* ✅ Configured with proper Jira API credentials
+
+![1756827649726](image/README/1756827649726.png)
 
 **Integration Configuration:**
+
+* ✅ Set up scheduled sync every 30 minutes
 
 ```yaml
 # GitHub workflow configuration used
@@ -328,7 +190,6 @@ jobs:
 #### 4. Data Model Configuration
 
 - ✅ Added relation from "Jira Issue" blueprint to "Repository" blueprint
-- ✅ Configured many-to-many relationship (issue can relate to multiple repositories)
 - ✅ Updated blueprint schema to support component mapping
 
 #### ScreenShot
@@ -339,21 +200,30 @@ jobs:
 
 Created components matching GitHub repositories:
 
-- ✅ `port-task` component → matches `port-task` repository
-- ✅ `ilearnova-be` component → matches `ilearnova-be` repository
 - ✅ Components created in Jira project settings (not Atlassian Compass)
 
 #### ScreenShot
 
+* ✅ `port-task` component → matches `port-task` repository
+
 ![1756827884259](image/README/1756827884259.png)
+
+* ✅ `ilearnova-be` component → matches `ilearnova-be` repository
 
 ![1756827892058](image/README/1756827892058.png)
 
+* Adding issues and assinging them to components
+
 ![1756828076696](image/README/1756828076696.png)
+
+* showing the different number of issues in each component
 
 ![1756828091354](image/README/1756828091354.png)
 
 #### 6. Integration Mapping Configuration
+
+* ✅ Configured many-to-many relationship (issue can relate to multiple repositories)
+* ✅ Integration runs on schedule without "Hosted by Port"
 
 **JQ Mapping for Repository Relation:**
 
@@ -367,20 +237,20 @@ end
 
 #### ScreenShot
 
+* mapping jira issues to github repositories
+
 ![1756827751265](image/README/1756827751265.png)
 
+* Jira issues displaying in port and it's linked to the respective repositories
+* ✅ Multiple components on single issue create multiple repository relations
+
 ![1756827956821](image/README/1756827956821.png)
+
+* ✅ Real data flows from both Jira and GitHub into Port catalog
 
 ![1756827966653](image/README/1756827966653.png)
 
 **Explanation:** This mapping extracts component names from Jira issues and creates relations to repositories with matching names. The conditional handles issues without components gracefully.
-
-### Verification
-
-- ✅ Jira issues with components successfully relate to corresponding GitHub repositories
-- ✅ Multiple components on single issue create multiple repository relations
-- ✅ Integration runs on schedule without "Hosted by Port"
-- ✅ Real data flows from both Jira and GitHub into Port catalog
 
 ---
 
@@ -415,7 +285,11 @@ Create a scorecard for repositories that tracks open pull requests with the foll
 
 #### ScreenShot
 
+* Property creation
+
 ![1756831559498](image/README/1756831559498.png)
+
+* ScoreCard creation
 
 ![1756831777078](image/README/1756831777078.png)
 
@@ -515,20 +389,25 @@ The property uses Port's built-in GitHub integration to count open pull requests
 
 #### ScreenShot
 
+* Repository
+
 ![Scorecard Rules](https://lh7-rt.googleusercontent.com/docsz/AD_4nXc1s_M7vxVajtkrmDiGDPXZcDpUkZsuDIQJbwhNjeewFaLQWKJT_jYdIW7dxQQXHI5XdO2RaShzVpBipVI1-NAPKkaORKfwE1velwBpGW88g3uvWeomFlftX7F4yRg8_ldu6N0b7A?key=KiLXQHrkgBd-SxCs2HeFfw)
 
 ![Scorecard Results](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdCuQIzbVttZI6tN05y-RO0gm31p7MiwmUDQggT94sDfCYCcb1LnSaOm_-l136AjxiWv9KULIdhoeboTpKPTV9IsjAdgJb5-GnDacmavfXp8DfnlXRhzet_Dz_BzWcKKDBgmTYEjw?key=KiLXQHrkgBd-SxCs2HeFfw)
 
+* Sample Repo with open pull request
+
 ![1756833250410](image/README/1756833250410.png)
+
+* Pull Requests available on port showing Real Data ingested
 
 ![1756833554565](image/README/1756833554565.png)
 
-![1756832788933](image/README/1756832788933.png)
-
-### Verification
-
 - ✅ Property correctly counts open PRs from real GitHub repositories
 - ✅ Scorecard rules properly evaluate against the defined thresholds
+
+![1756832788933](image/README/1756832788933.png)
+
 - ✅ Multiple repositories tested with different PR counts
 - ✅ Results accurately reflect Gold/Silver/Bronze levels based on criteria
 
@@ -605,7 +484,6 @@ Based on Port's official documentation and testing:
 1. **Configuration Accuracy is Critical**: Even minor typos in organization names prevent workflow triggering
 2. **Port's Documentation is Authoritative**: Following the official troubleshooting steps resolved the issue immediately
 3. **Real-time Testing Validates Solutions**: Recreating the issue confirmed the root cause and resolution
-
 
 ---
 
