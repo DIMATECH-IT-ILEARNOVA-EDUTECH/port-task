@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-MongoDB Collection to CSV Exporter
+MongoDB Collections to CSV Exporter
 
-This script connects to a MongoDB database, checks if a specified collection exists,
-and exports all documents from that collection to a CSV file.
+This script connects to a MongoDB database, checks if specified collections exist,
+and exports all documents from those collections to CSV files.
 
 Usage:
-    python mongo_to_csv.py <collection_name> [options]
+    python mongo_to_csv.py <collection_names> [options]
 
 Requirements:
     - pymongo
@@ -15,6 +15,7 @@ Requirements:
 
 import argparse
 import csv
+import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -166,13 +167,13 @@ class MongoToCSVExporter:
 
         return dict(items)
 
-    def export_to_csv(self, collection_name: str, output_file: Optional[str] = None,
+    def export_to_csv(self, collection_names: List[str], output_file: Optional[str] = None,
                      flatten: bool = True, batch_size: int = 1000) -> bool:
         """
-        Export collection to CSV file.
+        Export collections to CSV files.
 
         Args:
-            collection_name: Name of the collection to export
+            collection_names: Names of the collections to export
             output_file: Output CSV file path (optional)
             flatten: Whether to flatten nested documents
             batch_size: Number of documents to process at once
@@ -180,58 +181,58 @@ class MongoToCSVExporter:
         Returns:
             bool: True if export successful, False otherwise
         """
-        if not self.collection_exists(collection_name):
-            return False
+        for collection_name in collection_names:
+            if not self.collection_exists(collection_name):
+                continue
 
-        # Set default output file name
-        if not output_file:
-            output_file = f"{collection_name}_export.csv"
+            # Set default output file name
+            output_file = f"env/{collection_name}_export.csv"
 
-        collection = self.db[collection_name]
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
-        try:
-            # Get collection info
-            info = self.get_collection_info(collection_name)
-            total_docs = info['document_count']
+            collection = self.db[collection_name]
 
-            if total_docs == 0:
-                self.logger.warning(f"Collection '{collection_name}' is empty")
-                return False
+            try:
+                # Get collection info
+                info = self.get_collection_info(collection_name)
+                total_docs = info['document_count']
 
-            self.logger.info(f"Starting export of {total_docs} documents to {output_file}")
+                if total_docs == 0:
+                    self.logger.warning(f"Collection '{collection_name}' is empty")
+                    return False
 
-            # Process documents in batches
-            all_documents = []
-            processed = 0
+                self.logger.info(f"Starting export of {total_docs} documents to {output_file}")
 
-            cursor = collection.find()
+                # Process documents in batches
+                all_documents = []
+                processed = 0
 
-            for doc in cursor:
-                if flatten:
-                    doc = self.flatten_document(doc)
+                cursor = collection.find()
 
-                # Convert ObjectId to string
-                if '_id' in doc:
-                    doc['_id'] = str(doc['_id'])
+                for doc in cursor:
+                    if flatten:
+                        doc = self.flatten_document(doc)
 
-                all_documents.append(doc)
-                processed += 1
+                    # Convert ObjectId to string
+                    if '_id' in doc:
+                        doc['_id'] = str(doc['_id'])
 
-                if processed % batch_size == 0:
-                    self.logger.info(f"Processed {processed}/{total_docs} documents")
+                    all_documents.append(doc)
+                    processed += 1
 
-            # Convert to DataFrame and save as CSV
-            df = pd.DataFrame(all_documents)
-            df.to_csv(output_file, index=False)
+                    if processed % batch_size == 0:
+                        self.logger.info(f"Processed {processed}/{total_docs} documents")
 
-            self.logger.info(f"Successfully exported {processed} documents to {output_file}")
-            self.logger.info(f"CSV file shape: {df.shape}")
+                # Convert to DataFrame and save as CSV
+                df = pd.DataFrame(all_documents)
+                df.to_csv(output_file, index=False)
 
-            return True
+                self.logger.info(f"Successfully exported {processed} documents to {output_file}")
+                self.logger.info(f"CSV file shape: {df.shape}")
 
-        except Exception as e:
-            self.logger.error(f"Error during export: {e}")
-            return False
+            except Exception as e:
+                self.logger.error(f"Error during export: {e}")
+        return True
 
     def close(self):
         """Close the MongoDB connection."""
@@ -243,7 +244,7 @@ class MongoToCSVExporter:
 def main():
     """Main function to handle command line arguments and execute export."""
     parser = argparse.ArgumentParser(
-        description="Export MongoDB collection to CSV file",
+        description="Export MongoDB collections to CSV files",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -253,7 +254,7 @@ Examples:
         """
     )
 
-    parser.add_argument('collection', help='Name of the MongoDB collection to export')
+    parser.add_argument('collections', nargs='+', help='Names of the MongoDB collections to export')
     parser.add_argument('--output', '-o', help='Output CSV file path')
     parser.add_argument('--database', '-d', default='test', help='Database name (default: test)')
     parser.add_argument('--connection', '-c', default='mongodb://localhost:27017/',
@@ -276,9 +277,9 @@ Examples:
         if not exporter.connect():
             sys.exit(1)
 
-        # Export collection
+        # Export collections
         success = exporter.export_to_csv(
-            collection_name=args.collection,
+            collection_names=args.collections,
             output_file=args.output,
             flatten=not args.no_flatten,
             batch_size=args.batch_size
