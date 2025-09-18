@@ -30,12 +30,12 @@ Requirements:
 """
 
 import argparse
-import os
-import sys
-from typing import Dict, List, Optional, Any, Tuple, Iterable
 import logging
-from datetime import datetime, timezone
+import os
 import re
+import sys
+from datetime import datetime, timezone
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 try:
     from pymongo import MongoClient
@@ -97,23 +97,55 @@ def quote_ident(ident: str) -> str:
 def to_utc_datetime(value: Any) -> Optional[datetime]:
     """
     Convert incoming value to an aware UTC datetime if possible.
-    Accepts datetime (naive or aware) or string timestamp.
+    Accepts datetime (naive or aware), string timestamp, or Unix timestamp (int/float).
     """
     if value is None:
         return None
+
+    # Handle datetime objects
     if isinstance(value, datetime):
         dt = value
-    else:
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt
+
+    # Handle Unix timestamps (numbers)
+    if isinstance(value, (int, float)):
         try:
+            if value > 1e10:
+                timestamp = value / 1000.0
+            else:
+                timestamp = value
+            dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            return dt
+        except (ValueError, OSError):
+            return None
+
+    # Handle string timestamps
+    if isinstance(value, str):
+        try:
+            try:
+                timestamp = float(value)
+                if timestamp > 1e10:
+                    timestamp = timestamp / 1000.0
+                dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                return dt
+            except ValueError:
+                pass
+
+            # Fall back to dateutil parsing
             dt = dtparser.parse(str(value))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt = dt.astimezone(timezone.utc)
+            return dt
         except Exception:
             return None
-    if dt.tzinfo is None:
-        # Assume naive timestamps are UTC
-        dt = dt.replace(tzinfo=timezone.utc)
-    else:
-        dt = dt.astimezone(timezone.utc)
-    return dt
+
+    return None
 
 
 def infer_pg_type(value: Any) -> Optional[str]:
@@ -126,19 +158,32 @@ def infer_pg_type(value: Any) -> Optional[str]:
     # JSON-like
     if isinstance(value, (dict, list)):
         return "jsonb"
-    # datetime
-    if isinstance(value, datetime) or isinstance(value, str):
-        # Try parse to datetime
-        dt = to_utc_datetime(value) if not isinstance(value, datetime) else value
-        if dt is not None:
-            return "timestamptz"
-    # primitives
+    # datetime - check datetime objects first
+    if isinstance(value, datetime):
+        return "timestamptz"
+    # primitives (check bool before int since bool is subclass of int)
     if isinstance(value, bool):
         return "boolean"
-    if isinstance(value, int) and not isinstance(value, bool):
-        return "bigint"
-    if isinstance(value, float):
-        return "double precision"
+
+    # Check for Unix timestamps (common pattern in MongoDB)
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) or (isinstance(value, int) and value > 1000000000):
+            dt = to_utc_datetime(value)
+            if dt is not None:
+                return "timestamptz"
+        # Regular numbers
+        if isinstance(value, int):
+            return "bigint"
+        else:
+            return "double precision"
+
+    # For strings, try to detect if it's a timestamp
+    if isinstance(value, str):
+        # Only try datetime parsing for strings that look like timestamps
+        if any(char in value for char in ['-', ':', 'T', 'Z']) and len(value) > 8:
+            dt = to_utc_datetime(value)
+            if dt is not None:
+                return "timestamptz"
     # default to text
     return "text"
 
@@ -187,9 +232,9 @@ class MongoToCSVExporter:
         try:
             self.client = MongoClient(
                 self.connection_string,
-                timeoutMS=self.timeout
+                serverSelectionTimeoutMS=self.timeout
             )
-            # Test the connection
+
             self.client.admin.command('ping')
             self.db = self.client[self.database_name]
             self.logger.info(f"Successfully connected to MongoDB database: {self.database_name}")
@@ -238,8 +283,7 @@ class MongoToCSVExporter:
             if isinstance(v, dict):
                 items.extend(self.flatten_document(v, new_key, sep=sep).items())
             elif isinstance(v, list):
-                # Convert lists to string representation for CSV
-                items.append((new_key, str(v)))
+                items.append((new_key, v))
             else:
                 items.append((new_key, v))
         return dict(items)
@@ -272,7 +316,10 @@ class MongoToCSVExporter:
                 for doc in cursor:
                     if flatten:
                         doc = self.flatten_document(doc)
-                    # Convert ObjectId to string
+                        # Convert lists to strings for CSV compatibility
+                        for key, value in doc.items():
+                            if isinstance(value, list):
+                                doc[key] = str(value)
                     if '_id' in doc:
                         doc['_id'] = str(doc['_id'])
                     all_documents.append(doc)
@@ -335,9 +382,16 @@ class MongoToPostgresSyncer:
         if self.dry_run:
             self.logger.info(f"[DRY-RUN] Would connect to Postgres: {self.pg_url}")
             return
-        self.pg_conn = psycopg2.connect(self.pg_url)
-        self.pg_conn.autocommit = False
-        self.logger.info("Connected to Postgres")
+        try:
+            self.pg_conn = psycopg2.connect(self.pg_url)
+            self.pg_conn.autocommit = False
+            self.logger.info("Connected to Postgres")
+        except psycopg2.Error as e:
+            self.logger.error(f"Failed to connect to PostgreSQL: {e}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error connecting to PostgreSQL: {e}")
+            raise
 
     def close(self):
         if self.pg_conn:
@@ -348,28 +402,40 @@ class MongoToPostgresSyncer:
         if self.dry_run:
             self.logger.info(f"[DRY-RUN] Would ensure schema exists: {self.pg_schema}")
             return
-        with self.pg_conn.cursor() as cur:
-            cur.execute(f'CREATE SCHEMA IF NOT EXISTS {quote_ident(self.pg_schema)};')
-            self.pg_conn.commit()
+        try:
+            with self.pg_conn.cursor() as cur:
+                cur.execute(f'CREATE SCHEMA IF NOT EXISTS {quote_ident(self.pg_schema)};')
+                self.pg_conn.commit()
+        except psycopg2.Error as e:
+            self.logger.error(f"Failed to create schema {self.pg_schema}: {e}")
+            self.pg_conn.rollback()
+            raise
 
     def ensure_table(self, collection_name: str) -> Tuple[str, str]:
         table = sanitize_identifier(collection_name)
         if self.dry_run:
             self.logger.info(f"[DRY-RUN] Would ensure table exists: {self.pg_schema}.{table}")
             return self.pg_schema, table
-        with self.pg_conn.cursor() as cur:
-            cur.execute(f"""
-                CREATE TABLE IF NOT EXISTS {quote_ident(self.pg_schema)}.{quote_ident(table)} (
-                    id TEXT PRIMARY KEY,
-                    updated TIMESTAMPTZ NOT NULL
-                );
-            """)
-            # Index on updated
-            cur.execute(f"""
-                CREATE INDEX IF NOT EXISTS {quote_ident(f'idx_{self.pg_schema}_{table}_updated')}
-                ON {quote_ident(self.pg_schema)}.{quote_ident(table)} (updated);
-            """)
-            self.pg_conn.commit()
+        try:
+            with self.pg_conn.cursor() as cur:
+                cur.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {quote_ident(self.pg_schema)}.{quote_ident(table)} (
+                        id TEXT PRIMARY KEY,
+                        updated TIMESTAMPTZ NOT NULL
+                    );
+                """)
+                idx_name = f'idx_{self.pg_schema}_{table}_updated'
+                if len(idx_name) > 63:
+                    idx_name = idx_name[:63]
+                cur.execute(f"""
+                    CREATE INDEX IF NOT EXISTS {quote_ident(idx_name)}
+                    ON {quote_ident(self.pg_schema)}.{quote_ident(table)} (updated);
+                """)
+                self.pg_conn.commit()
+        except psycopg2.Error as e:
+            self.logger.error(f"Failed to create table {self.pg_schema}.{table}: {e}")
+            self.pg_conn.rollback()
+            raise
         return self.pg_schema, table
 
     def get_existing_columns(self, schema: str, table: str) -> Dict[str, str]:
@@ -391,12 +457,17 @@ class MongoToPostgresSyncer:
         if self.dry_run:
             self.logger.info(f"[DRY-RUN] Would add column {schema}.{table}.{col} {col_type}")
             return
-        with self.pg_conn.cursor() as cur:
-            cur.execute(f"""
-                ALTER TABLE {quote_ident(schema)}.{quote_ident(table)}
-                ADD COLUMN IF NOT EXISTS {quote_ident(col)} {col_type};
-            """)
-        self.pg_conn.commit()
+        try:
+            with self.pg_conn.cursor() as cur:
+                cur.execute(f"""
+                    ALTER TABLE {quote_ident(schema)}.{quote_ident(table)}
+                    ADD COLUMN IF NOT EXISTS {quote_ident(col)} {col_type};
+                """)
+            self.pg_conn.commit()
+        except psycopg2.Error as e:
+            self.logger.error(f"Failed to add column {schema}.{table}.{col}: {e}")
+            self.pg_conn.rollback()
+            raise
 
     def ensure_indexes(self, schema: str, table: str, existing_cols: Dict[str, str]):
         # updated index ensured in ensure_table
@@ -484,23 +555,36 @@ class MongoToPostgresSyncer:
         # Flatten first to collect all keys
         flattened_docs: List[Dict[str, Any]] = []
         all_keys: set = set()
+
         for d in docs:
             # Convert _id to str id
             base = dict(d)
             _id = base.get("_id")
             if _id is not None:
                 base["id"] = str(_id)
-            # Ensure updated extracted from original doc (not flattened)
+
+            # Extract updated field BEFORE flattening to preserve original field name
+            updated_value = None
             if self.updated_field in base:
-                base["updated"] = to_utc_datetime(base[self.updated_field])
+                updated_value = to_utc_datetime(base[self.updated_field])
+                base["updated"] = updated_value
+
             # Flatten if requested
             flat = self.flatten_document(base) if self.flatten else base
-            # If updated missing in flattened, attempt from flattened keys
-            if "updated" not in flat and self.updated_field in flat:
-                flat["updated"] = to_utc_datetime(flat[self.updated_field])
+
+            # Handle case where updated field might be nested and flattened
+            if "updated" not in flat:
+                # Look for the updated field in flattened keys
+                for key, value in flat.items():
+                    if key == self.updated_field or key.endswith(f".{self.updated_field}"):
+                        updated_value = to_utc_datetime(value)
+                        flat["updated"] = updated_value
+                        break
+
             # Guarantee id present
             if "id" not in flat and "_id" in flat:
                 flat["id"] = str(flat["_id"])
+
             flattened_docs.append(flat)
             all_keys.update(flat.keys())
 
@@ -513,12 +597,17 @@ class MongoToPostgresSyncer:
             for k, v in flat.items():
                 col = col_map[k]
                 val = v
-                # Normalize certain types
-                if col == "updated":
+
+                if k == "updated":
                     val = to_utc_datetime(val)
-                # psycopg2 Json wrapper for JSONB columns will be applied later if needed
+                else:
+                    inferred_type = infer_pg_type(val)
+                    if inferred_type == "timestamptz":
+                        converted_val = to_utc_datetime(val)
+                        if converted_val is not None:
+                            val = converted_val
+
                 row[col] = val
-                # Type inference
                 t = infer_pg_type(val)
                 if t is None:
                     continue
@@ -526,19 +615,44 @@ class MongoToPostgresSyncer:
                     inferred_types[col] = promote_type(inferred_types[col], t)
                 else:
                     inferred_types[col] = t
-            # Ensure mandatory fields
-            if "id" not in row:
+
+            id_col = col_map.get("id")
+            updated_col = col_map.get("updated")
+
+            if not id_col or id_col not in row:
                 self.logger.warning("Document missing _id; skipping row.")
                 continue
-            if "updated" not in row or row["updated"] is None:
-                self.logger.warning("Document missing/invalid 'updated'; skipping row with id=%s", row.get("id"))
+            if not updated_col or updated_col not in row or row[updated_col] is None:
+                self.logger.warning("Document missing/invalid 'updated'; skipping row with id=%s", row.get(id_col))
                 continue
             rows.append(row)
 
-        # Ensure mandatory columns types
-        inferred_types["id"] = "text"
-        inferred_types["updated"] = "timestamptz"
+        # Ensure mandatory columns types using sanitized column names
+        id_col = col_map.get("id", "id")
+        updated_col = col_map.get("updated", "updated")
+        inferred_types[id_col] = "text"
+        inferred_types[updated_col] = "timestamptz"
         return rows, inferred_types
+
+    def normalize_pg_type(self, pg_type: str) -> str:
+        """Normalize PostgreSQL type names from information_schema to our standard names."""
+        type_mapping = {
+            "timestamp with time zone": "timestamptz",
+            "character varying": "text",
+            "character": "text",
+            "varchar": "text",
+            "char": "text",
+            "integer": "bigint",
+            "int4": "bigint",
+            "int8": "bigint",
+            "float8": "double precision",
+            "float4": "double precision",
+            "real": "double precision",
+            "numeric": "double precision",
+            "decimal": "double precision",
+            "bool": "boolean",
+        }
+        return type_mapping.get(pg_type.lower(), pg_type)
 
     def evolve_schema(self, schema: str, table: str, existing_cols: Dict[str, str], inferred_types: Dict[str, str]) -> Dict[str, str]:
         """
@@ -547,13 +661,7 @@ class MongoToPostgresSyncer:
         """
         for col, t in inferred_types.items():
             if col in existing_cols:
-                # basic mismatch detection (ignore synonyms)
-                existing_t = existing_cols[col]
-                # Normalize some information_schema names
-                if existing_t == "timestamp with time zone":
-                    existing_t = "timestamptz"
-                if existing_t == "double precision":
-                    existing_t = "double precision"
+                existing_t = self.normalize_pg_type(existing_cols[col])
                 if existing_t != t and col not in ("id", "updated"):
                     self.logger.warning(f"Detected type mismatch for column {schema}.{table}.{col}: existing {existing_t}, incoming {t}. Leaving as-is.")
                 continue
@@ -565,39 +673,67 @@ class MongoToPostgresSyncer:
     def bulk_upsert(self, schema: str, table: str, rows: List[Dict[str, Any]], existing_cols: Dict[str, str]):
         if not rows:
             return 0, 0
-        # Build column list (ensure id and updated first)
         all_cols = set()
         for r in rows:
             all_cols.update(r.keys())
-        cols_order = ["id", "updated"] + sorted([c for c in all_cols if c not in ("id", "updated")])
 
-        # Prepare data rows according to order; wrap JSONB values using pg_extras.Json
+        id_col = None
+        updated_col = None
+        for col in all_cols:
+            if col == "id":
+                id_col = col
+            if col == "updated":
+                updated_col = col
+
+        if not id_col:
+            for col in all_cols:
+                if col.endswith("_id") and "id" in col:
+                    id_col = col
+                    break
+        if not updated_col:
+            for col in all_cols:
+                if "updated" in col:
+                    updated_col = col
+                    break
+
+        if not id_col:
+            id_col = "id"
+        if not updated_col:
+            updated_col = "updated"
+
+        other_cols = sorted([c for c in all_cols if c not in (id_col, updated_col)])
+        cols_order = [id_col, updated_col] + other_cols
+
         data = []
         jsonb_cols = {c for c, t in existing_cols.items() if t in ("jsonb",)}
         for r in rows:
             record = []
             for c in cols_order:
                 val = r.get(c)
-                if c in jsonb_cols and val is not None:
+                if c in jsonb_cols:
                     record.append(pg_extras.Json(val))
                 else:
                     record.append(val)
             data.append(tuple(record))
 
         columns_sql = ", ".join(quote_ident(c) for c in cols_order)
-        update_sql = ", ".join(f"{quote_ident(c)} = EXCLUDED.{quote_ident(c)}" for c in cols_order if c != "id")
+        update_sql = ", ".join(f"{quote_ident(c)} = EXCLUDED.{quote_ident(c)}" for c in cols_order if c != id_col)
         table_sql = f"{quote_ident(schema)}.{quote_ident(table)}"
-        insert_sql = f"INSERT INTO {table_sql} ({columns_sql}) VALUES %s ON CONFLICT (id) DO UPDATE SET {update_sql};"
+        insert_sql = f"INSERT INTO {table_sql} ({columns_sql}) VALUES %s ON CONFLICT ({quote_ident(id_col)}) DO UPDATE SET {update_sql};"
 
         if self.dry_run:
             self.logger.info(f"[DRY-RUN] Would upsert {len(rows)} rows into {schema}.{table} with columns: {cols_order}")
             return len(rows), 0
 
-        with self.pg_conn.cursor() as cur:
-            pg_extras.execute_values(cur, insert_sql, data, page_size=self.batch_size)
-        # We cannot easily separate inserted vs updated without RETURNING; for simplicity, log total upserts
-        self.pg_conn.commit()
-        return len(rows), 0
+        try:
+            with self.pg_conn.cursor() as cur:
+                pg_extras.execute_values(cur, insert_sql, data, page_size=self.batch_size)
+            self.pg_conn.commit()
+            return len(rows), 0
+        except psycopg2.Error as e:
+            self.logger.error(f"Failed to upsert batch into {schema}.{table}: {e}")
+            self.pg_conn.rollback()
+            raise
 
     def sync_collection(self, collection_name: str, since: Optional[datetime] = None) -> Tuple[int, int]:
         """
@@ -607,8 +743,6 @@ class MongoToPostgresSyncer:
         self.ensure_schema()
         schema, table = self.ensure_table(collection_name)
         existing_cols = self.get_existing_columns(schema, table)
-        print("existing cols: ", existing_cols)
-        # Apply secondary indexes if requested
         self.ensure_indexes(schema, table, existing_cols)
 
         last_ts = self.get_last_updated_ts(schema, table)
@@ -629,9 +763,11 @@ class MongoToPostgresSyncer:
             total_upserted += upserted
             total_batches += 1
             # Track high watermark
-            batch_max = max(r["updated"] for r in rows if "updated" in r and r["updated"])
-            if high_watermark is None or (batch_max and batch_max > high_watermark):
-                high_watermark = batch_max
+            valid_timestamps = [r["updated"] for r in rows if "updated" in r and r["updated"] is not None]
+            if valid_timestamps:
+                batch_max = max(valid_timestamps)
+                if high_watermark is None or batch_max > high_watermark:
+                    high_watermark = batch_max
             self.logger.info(f"Synced batch {total_batches}: upserted={upserted}, high_watermark={high_watermark}")
 
         self.logger.info(f"Completed sync for collection '{collection_name}': upserted={total_upserted}, batches={total_batches}, last_updated={high_watermark}")
